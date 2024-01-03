@@ -8,7 +8,8 @@ from enum import Enum
 from pathlib import Path
 from typing import BinaryIO, List, Literal, Optional, Sequence, Tuple, Type, Union
 
-import lzf
+from . import lzf_py as lzf
+
 import numpy as np
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 
