@@ -222,6 +222,8 @@ class PointCloud:
         metadata = MetaData.parse_header(lines)
         pc_data = _parse_pc_data(fp, metadata)
 
+        fp.seek(0)
+
         return PointCloud(metadata, pc_data)
 
     @staticmethod
@@ -246,7 +248,7 @@ class PointCloud:
 
     @staticmethod
     def from_points(
-        points: Union[np.ndarray, List[np.ndarray], Tuple[np.ndarray]],
+        points: Union[np.ndarray, List[np.ndarray], Tuple[np.ndarray, ...]],
         fields: Sequence[str],
         types: Sequence[Union[NpNumberType, np.dtype]],
         count: Optional[Sequence[int]] = None,
@@ -254,7 +256,7 @@ class PointCloud:
         """Create PointCloud from 2D numpy array or sequence of 1D numpy arrays of each field
 
         Args:
-            points (Union[np.ndarray, Sequence[np.ndarray]]): Numpy array
+            points (Union[np.ndarray, List[np.ndarray], Tuple[np.ndarray, ...]]): Numpy array
             fields (Sequence[str]): Field names for each numpy array or sequence of numpy arrays
             types (Sequence[Union[NpNumberType, np.dtype]]): Numpy type for each numpy array or
                 sequence of numpy arrays
@@ -667,6 +669,35 @@ class PointCloud:
         _stack = tuple(self.pc_data[field] for field in fields)
 
         return np.vstack(_stack).T
+
+    def concatenate(self, other: PointCloud) -> PointCloud:
+        """
+        Concatenates two point clouds together
+        """
+
+        return self.__add__(other)
+
+    def __add__(self, other: PointCloud) -> PointCloud:
+        """
+        Concatenates two point clouds together
+        """
+
+        if self.fields != other.fields:
+            raise ValueError(
+                "Can't concatenate point clouds with different fields. "
+                f"({self.fields} vs. {other.fields})"
+            )
+        if self.types != other.types:
+            raise ValueError(
+                "Can't concatenate point clouds with different metadata. "
+                f"({self.types} vs. {other.types})"
+            )
+
+        concatenated_pc = PointCloud.from_points(
+            np.vstack((self.numpy(), other.numpy())), self.fields, self.types
+        )
+
+        return concatenated_pc
 
     def _save_as_ascii(self, fp: BinaryIO) -> None:
         """Saves point cloud to a file as a ascii
