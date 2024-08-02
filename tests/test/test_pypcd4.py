@@ -1,3 +1,5 @@
+# ruff: noqa: ANN001, ANN201
+
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -5,7 +7,6 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pytest
 from pydantic import ValidationError
-
 from pypcd4 import Encoding, MetaData, PointCloud
 
 
@@ -129,7 +130,9 @@ def test_parse_pcd_header_with_negative_viewpoint(pcd_header_with_negative_viewp
     assert metadata.data == "ascii"
 
 
-def test_parse_pcd_header_with_underscore_in_fields(pcd_header_with_underscore_in_fields):
+def test_parse_pcd_header_with_underscore_in_fields(
+    pcd_header_with_underscore_in_fields,
+):
     metadata = MetaData.parse_header(pcd_header_with_underscore_in_fields)
 
     assert metadata.version == ".7"
@@ -180,10 +183,10 @@ def test_build_dtype_with_multi_count_fields(pcd_header_with_multi_count_fields)
     assert metadata.build_dtype() == [
         ("x", "<f4"),
         ("y", "<f4"),
-        ("z_0000", "<f4"),
-        ("z_0001", "<f4"),
-        ("z_0002", "<f4"),
-        ("z_0003", "<f4"),
+        ("z__0000", "<f4"),
+        ("z__0001", "<f4"),
+        ("z__0002", "<f4"),
+        ("z__0003", "<f4"),
     ]
 
 
@@ -241,6 +244,14 @@ def test_load_xyzrgb_ascii_with_empty_points_pcd(xyzrgb_ascii_with_empty_points_
     assert len(pc.pc_data) == pc.metadata.points
 
 
+def test_load_xyzintensity_ascii_organized_pcd(xyzintensity_ascii_organized_path):
+    pc = PointCloud.from_path(xyzintensity_ascii_organized_path)
+
+    assert pc.metadata.data == "ascii"
+    assert pc.pc_data.dtype.names == pc.metadata.fields
+    assert len(pc.pc_data) == pc.metadata.points
+
+
 def test_load_binary_pcd(xyzrgb_binary_path):
     pc = PointCloud.from_path(xyzrgb_binary_path)
 
@@ -257,17 +268,36 @@ def test_load_binary_compressed_pcd(xyzrgb_binary_compressed_path):
     assert len(pc.pc_data) == pc.metadata.points
 
 
+def test_load_binary_compressed_organized_pcd(xyzintensity_binary_compressed_organized_path):
+    pc = PointCloud.from_path(xyzintensity_binary_compressed_organized_path)
+
+    assert pc.metadata.data == "binary_compressed"
+    assert pc.pc_data.dtype.names == pc.metadata.fields
+    assert len(pc.pc_data) == pc.metadata.points
+
+
+def test_load_ascii_empty_pcd(ascii_empty_path):
+    with pytest.raises(ValidationError):
+        PointCloud.from_path(ascii_empty_path)
+
+
+def test_load_ascii_invalid_header_pcd(ascii_invalid_header_path):
+    with pytest.raises(ValidationError):
+        PointCloud.from_path(ascii_invalid_header_path)
+
+
 def test_from_points():
     array = np.array([[1, 2, 3], [4, 5, 6]])
     fields = ("x", "y", "z")
     types = (np.float32, np.float32, np.float32)
-    count = (1, 1, 1)
+    counts = (1, 1, 1)
 
-    pc = PointCloud.from_points(array, fields, types, count)
+    pc = PointCloud.from_points(array, fields, types, counts)
 
     assert pc.fields == fields
     assert pc.types == types
     assert pc.points == 2
+    assert pc.counts == counts
     assert pc.pc_data.dtype.names == fields
 
     assert np.array_equal(pc.pc_data["x"], array.T[0])
@@ -406,19 +436,40 @@ def test_from_xyzirgbl_points():
     pc = PointCloud.from_xyzirgbl_points(points, label_type)
 
     assert pc.fields == ("x", "y", "z", "intensity", "rgb", "label")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.float32, label_type)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        label_type,
+    )
 
     label_type = np.float32
     pc = PointCloud.from_xyzirgbl_points(points, label_type)
 
     assert pc.fields == ("x", "y", "z", "intensity", "rgb", "label")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.float32, label_type)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        label_type,
+    )
 
     label_type = np.uint8
     pc = PointCloud.from_xyzirgbl_points(points, label_type)
 
     assert pc.fields == ("x", "y", "z", "intensity", "rgb", "label")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.float32, label_type)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        label_type,
+    )
 
 
 def test_from_xyzt_points():
@@ -445,7 +496,14 @@ def test_from_xyzirt_points():
     pc = PointCloud.from_xyzirt_points(points)
 
     assert pc.fields == ("x", "y", "z", "intensity", "ring", "time")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.uint16, np.float32)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.uint16,
+        np.float32,
+    )
 
 
 def test_from_xyzit_points():
@@ -472,7 +530,14 @@ def test_from_xyzisc_points():
     pc = PointCloud.from_xyzisc_points(points)
 
     assert pc.fields == ("x", "y", "z", "intensity", "stamp", "classification")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.float64, np.uint8)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float64,
+        np.uint8,
+    )
 
 
 def test_from_xyzrgbs_points():
@@ -490,7 +555,14 @@ def test_from_xyzirgbs_points():
     pc = PointCloud.from_xyzirgbs_points(points)
 
     assert pc.fields == ("x", "y", "z", "intensity", "rgb", "stamp")
-    assert pc.types == (np.float32, np.float32, np.float32, np.float32, np.float32, np.float64)
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float64,
+    )
 
 
 def test_from_xyzirgbsc_points():
@@ -618,6 +690,42 @@ def test_numpy():
     assert np.allclose(out_points, np.empty((0, 0)))
 
 
+def test_numpy_with_multi_count_fields(xyzintensity_ascii_multi_count_path):
+    pc = PointCloud.from_path(xyzintensity_ascii_multi_count_path)
+
+    assert pc.fields == (
+        "x",
+        "y",
+        "z",
+        "intensity__0000",
+        "intensity__0001",
+        "intensity__0002",
+        "intensity__0003",
+    )
+    assert pc.metadata.fields == (
+        "x",
+        "y",
+        "z",
+        "intensity",
+    )
+    assert pc.types == (
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+    )
+    assert pc.counts == (1, 1, 1, 1, 1, 1, 1)
+    assert pc.metadata.count == (1, 1, 1, 4)
+    assert pc.points == 8
+
+    points = pc.numpy()
+
+    assert points.shape == (8, 7)
+
+
 def test_save_as_ascii():
     in_points = np.random.randint(0, 1000, (100, 3))
     fields = ("x", "y", "z")
@@ -735,6 +843,7 @@ def test_save_to_bytes_io():
     assert pc2.points == pc.points
     assert pc2.metadata.data == pc.metadata.data
 
+
 def test_pointcloud_concatenation():
     in_points = np.random.randint(0, 1000, (100, 3))
     fields = ("x", "y", "z")
@@ -764,3 +873,64 @@ def test_pointcloud_concatenation():
         pc + pc5
 
 
+def test_pointcloud_getitem_with_slice():
+    in_points = np.random.randint(0, 1000, (100, 3))
+    fields = ("x", "y", "z")
+    types = (np.float32, np.int8, np.uint64)
+    pc = PointCloud.from_points(in_points, fields, types)
+
+    # Can filter PointCloud with a slice
+    pc2 = pc[10:30]
+    assert pc2.points == 20
+    assert pc2.fields == pc.fields
+    assert pc2.types == pc.types
+
+
+def test_pointcloud_getitem_with_boolean_mask():
+    in_points = np.random.randint(0, 1000, (100, 3))
+    fields = ("x", "y", "z")
+    types = (np.float32, np.int8, np.uint64)
+    pc = PointCloud.from_points(in_points, fields, types)
+
+    # Can filter PointCloud with a boolean mask
+    mask1 = (pc.pc_data["x"] > 0.5) & (pc.pc_data["y"] < 0.5)
+    pc2 = pc[mask1]
+    assert pc2.points == np.count_nonzero(mask1)
+    assert pc2.fields == pc.fields
+    assert pc2.types == pc.types
+
+    # Can filter PointCloud with a boolean mask can be squeezed
+    mask2 = pc.numpy("x") > 0.5
+    mask2 = mask2[:, None, None, None]
+    pc3 = pc[mask2]
+    assert pc3.points == np.count_nonzero(mask2)
+    assert pc3.fields == pc.fields
+    assert pc3.types == pc.types
+
+    # Cannot filter by a boolean mask since the dimension is not 1
+    mask3 = pc.numpy(("x", "y")) > 0.5
+    with pytest.raises(ValueError):
+        pc[mask3]
+
+
+def test_pointcloud_getitem_with_field_names():
+    in_points = np.random.randint(0, 1000, (100, 3))
+    fields = ("x", "y", "z")
+    types = (np.float32, np.int8, np.uint64)
+    pc = PointCloud.from_points(in_points, fields, types)
+
+    # Can filter PointCloud with a field name "x"
+    pc2 = pc["x"]
+    assert pc2.points == pc.points
+    assert pc2.fields == ("x",)
+    assert pc2.types == (np.float32,)
+
+    # Can filter PointCloud with a field names "x" and "y"
+    pc3 = pc[("x", "y")]
+    assert pc3.points == pc.points
+    assert pc3.fields == ("x", "y")
+    assert pc3.types == (np.float32, np.int8)
+
+    # Cannot filter by fields names since the field name "a" is invalid
+    with pytest.raises(ValueError):
+        pc[("x", "y", "a")]
